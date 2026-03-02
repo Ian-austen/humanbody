@@ -1,133 +1,144 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Canvas 写实人体交互</title>
+    <title>高清人体结构科普 - Canvas 交互版</title>
     <style>
-        body { margin: 0; background: #050505; color: white; font-family: sans-serif; overflow: hidden; display: flex; }
-        #ui { position: absolute; left: 20px; top: 20px; width: 300px; z-index: 10; pointer-events: none; }
-        .card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); padding: 20px; border-radius: 15px; pointer-events: all; border: 1px solid rgba(255,255,255,0.2); }
-        canvas { cursor: crosshair; }
-        h2 { margin-top: 0; color: #00d2ff; }
+        body { margin: 0; background: #1a1a1a; color: #fff; font-family: system-ui; overflow: hidden; display: flex; }
+        #app { display: flex; width: 100vw; height: 100vh; }
+        
+        /* 控制区 */
+        .panel { width: 320px; background: rgba(0,0,0,0.8); border-right: 1px solid #333; padding: 25px; z-index: 100; }
+        .info-box { background: #2c3e50; padding: 20px; border-radius: 12px; margin-top: 20px; border-left: 4px solid #3498db; }
+        
+        /* 画布区 */
+        .viewer { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; cursor: none; }
+        canvas { box-shadow: 0 0 50px rgba(0,0,0,0.5); border-radius: 8px; background: #fff; }
+        
+        /* 自定义放大镜指针 */
+        #lens {
+            position: absolute; width: 150px; height: 150px;
+            border: 3px solid #fff; border-radius: 50%;
+            pointer-events: none; visibility: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden; z-index: 10;
+        }
     </style>
 </head>
 <body>
 
-<div id="ui">
-    <div class="card">
-        <h2>数字人体系统</h2>
-        <p>当前状态: <span id="status" style="color:#00ff88">系统运行中</span></p>
-        <hr>
-        <p id="info">鼠标点击人体部位，查看 Canvas 实时渲染数据。</p>
-        <button onclick="toggleFlow()" style="width:100%; padding:10px; cursor:pointer">切换血液流动</button>
+<div id="app">
+    <div class="panel">
+        <h1>人体科普系统</h1>
+        <p>模式切换：</p>
+        <button onclick="currentMode='skin'" id="btn1">表层皮肤</button>
+        <button onclick="currentMode='organs'" id="btn2">内部解剖</button>
+        
+        <div class="info-box">
+            <h3 id="part-name">移动鼠标探索</h3>
+            <p id="part-desc">将圆圈对准人体部位，查看高清放大细节及功能介绍。</p>
+        </div>
+        <p style="font-size: 12px; color: #666; margin-top: 50px;">* 基于 Canvas 像素采样技术渲染</p>
+    </div>
+
+    <div class="viewer" id="v-box">
+        <canvas id="mainCanvas"></canvas>
+        <div id="lens"><canvas id="lensCanvas"></canvas></div>
     </div>
 </div>
 
-<canvas id="humanCanvas"></canvas>
-
 <script>
-    const canvas = document.getElementById('humanCanvas');
+    const canvas = document.getElementById('mainCanvas');
     const ctx = canvas.getContext('2d');
-    let width, height;
-    let particles = [];
-    let showFlow = true;
+    const lCanvas = document.getElementById('lensCanvas');
+    const lCtx = lCanvas.getContext('2d');
+    const lens = document.getElementById('lens');
+    const vBox = document.getElementById('v-box');
 
-    // 初始化尺寸
-    function resize() {
-        width = canvas.width = window.innerWidth;
-        height = canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resize);
-    resize();
+    let currentMode = 'skin'; // skin or organs
+    const cW = 400, cH = 700;
+    canvas.width = cW; canvas.height = cH;
+    lCanvas.width = 150; lCanvas.height = 150;
 
-    // 血液粒子类
-    class Particle {
-        constructor() {
-            this.reset();
+    // 模拟解剖数据
+    const anatomyData = [
+        { y: [50, 100], name: "头部", desc: "大脑是人体的指挥部，负责思考、记忆和控制全身运动。" },
+        { y: [120, 180], name: "胸腔 (肺/心)", desc: "包含心脏和肺部，负责呼吸循环和氧气运输。" },
+        { y: [200, 280], name: "腹部区域", desc: "集中了胃、肝、脾、肠等主要消化器官。" },
+        { y: [350, 600], name: "下肢", desc: "主要由股骨和强大的肌肉组成，支撑身体并提供动力。" }
+    ];
+
+    function drawHuman(tCtx, mode) {
+        tCtx.clearRect(0, 0, cW, cH);
+        
+        // 绘制写实轮廓渐变
+        const bodyGrd = tCtx.createLinearGradient(0, 0, cW, 0);
+        bodyGrd.addColorStop(0.3, mode === 'skin' ? '#ffdbac' : '#e74c3c');
+        bodyGrd.addColorStop(0.5, mode === 'skin' ? '#f1c27d' : '#c0392b');
+        bodyGrd.addColorStop(0.7, mode === 'skin' ? '#e8beac' : '#962d22');
+
+        tCtx.fillStyle = bodyGrd;
+        
+        // 绘制一个较为真实的人体外形路径
+        tCtx.beginPath();
+        tCtx.moveTo(200, 50); // 头顶
+        tCtx.bezierCurveTo(230, 50, 230, 100, 210, 110); // 脸部
+        tCtx.bezierCurveTo(260, 120, 280, 180, 270, 250); // 右臂
+        tCtx.lineTo(240, 250); // 右腋下
+        tCtx.bezierCurveTo(250, 350, 240, 650, 220, 680); // 右腿外侧
+        tCtx.lineTo(180, 680); // 右腿内侧
+        tCtx.lineTo(200, 400); // 裆部
+        tCtx.lineTo(220, 680); // 这里的逻辑简单示意
+        // (为了简洁，这里省略了左侧对称路径的细节，直接画一个闭合人形)
+        tCtx.lineTo(100, 680); 
+        tCtx.bezierCurveTo(150, 400, 150, 350, 130, 250);
+        tCtx.lineTo(100, 250);
+        tCtx.bezierCurveTo(120, 180, 140, 120, 190, 110);
+        tCtx.closePath();
+        tCtx.fill();
+
+        // 如果是器官模式，额外画一些内部结构
+        if(mode === 'organs') {
+            tCtx.fillStyle = "#fff";
+            tCtx.globalAlpha = 0.3;
+            tCtx.fillRect(185, 130, 30, 40); // 模拟心脏
+            tCtx.fillRect(160, 210, 80, 60); // 模拟肠胃
+            tCtx.globalAlpha = 1.0;
         }
-        reset() {
-            this.x = width / 2 + (Math.random() - 0.5) * 40;
-            this.y = height * 0.3; // 从心脏位置开始
-            this.vx = (Math.random() - 0.5) * 2;
-            this.vy = Math.random() * 3 + 2;
-            this.life = Math.random() * 100;
-            this.alpha = 1;
-        }
-        update() {
-            this.y += this.vy;
-            this.x += Math.sin(this.y / 20) * 1.5; // 模拟血管弯曲
-            this.life -= 0.5;
-            if (this.life <= 0 || this.y > height * 0.8) this.reset();
-        }
-        draw() {
-            ctx.fillStyle = `rgba(255, 0, 50, ${this.life / 100})`;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-
-    // 创建血液循环粒子
-    for(let i=0; i<50; i++) particles.push(new Particle());
-
-    function drawHuman() {
-        ctx.clearRect(0, 0, width, height);
-
-        // 1. 绘制人体剪影 (写实渐变)
-        const grd = ctx.createLinearGradient(0, 0, 0, height);
-        grd.addColorStop(0, "#1a1a1a");
-        grd.addColorStop(0.5, "#2c3e50");
-        grd.addColorStop(1, "#1a1a1a");
-
-        ctx.strokeStyle = "#00d2ff";
-        ctx.lineWidth = 2;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = "#00d2ff";
-
-        // 绘制一个简单的人体中轴
-        ctx.beginPath();
-        ctx.moveTo(width/2, height*0.1);
-        ctx.lineTo(width/2, height*0.9);
-        ctx.stroke();
-
-        // 2. 绘制会呼吸的“心脏”
-        const scale = 1 + Math.sin(Date.now() / 500) * 0.1;
-        ctx.fillStyle = "#ff0033";
-        ctx.shadowBlur = 20;
-        ctx.beginPath();
-        ctx.arc(width/2, height*0.3, 15 * scale, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 3. 渲染血液流动动画
-        if (showFlow) {
-            particles.forEach(p => {
-                p.update();
-                p.draw();
-            });
-        }
-
-        // 4. 绘制扫描线
-        const scanY = (Date.now() / 10) % height;
-        ctx.strokeStyle = "rgba(0, 210, 255, 0.2)";
-        ctx.beginPath();
-        ctx.moveTo(0, scanY);
-        ctx.lineTo(width, scanY);
-        ctx.stroke();
-
-        requestAnimationFrame(drawHuman);
     }
 
-    function toggleFlow() { showFlow = !showFlow; }
+    function update() {
+        drawHuman(ctx, currentMode);
+        requestAnimationFrame(update);
+    }
 
-    // 交互检测
-    canvas.addEventListener('mousedown', (e) => {
-        const dist = Math.hypot(e.clientX - width/2, e.clientY - height*0.3);
-        if(dist < 30) {
-            document.getElementById('info').innerHTML = "<b>心脏系统:</b> 正在每分钟跳动 72 次。Canvas 实时纹理检测正常。";
+    // 交互逻辑
+    vBox.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (x > 0 && x < cW && y > 0 && y < cH) {
+            lens.style.visibility = 'visible';
+            lens.style.left = (e.clientX - 75) + 'px';
+            lens.style.top = (e.clientY - 75) + 'px';
+
+            // 放大镜渲染：将主画布的内容放大 2 倍画到透镜里
+            lCtx.clearRect(0, 0, 150, 150);
+            lCtx.drawImage(canvas, x - 37.5, y - 37.5, 75, 75, 0, 0, 150, 150);
+
+            // 更新介绍
+            const found = anatomyData.find(d => y >= d.y[0] && y <= d.y[1]);
+            if(found) {
+                document.getElementById('part-name').innerText = found.name;
+                document.getElementById('part-desc').innerText = found.desc;
+            }
+        } else {
+            lens.style.visibility = 'hidden';
         }
     });
 
-    drawHuman();
+    update();
 </script>
 </body>
 </html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Canvas 写实人体交互</title>
+    <style>
+        body { margin: 0; background: #050505; color: white; font-family: sans-serif; overflow: hidden; display: flex; }
+        #ui { position: absolute; left: 20px; top: 20px; width: 300px; z-index: 10; pointer-events: none; }
+        .card { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); padding: 20px; border-radius: 15px; pointer-events: all; border: 1px solid rgba(255,255,255,0.2); }
+        canvas { cursor: crosshair; }
+        h2 { margin-top: 0; color: #00d2ff; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div class="card">
+        <h2>数字人体系统</h2>
+        <p>当前状态: <span id="status" style="color:#00ff88">系统运行中</span></p>
+        <hr>
+        <p id="info">鼠标点击人体部位，查看 Canvas 实时渲染数据。</p>
+        <button onclick="toggleFlow()" style="width:100%; padding:10px; cursor:pointer">切换血液流动</button>
+    </div>
+</div>
+
+<canvas id="humanCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('humanCanvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    let particles = [];
+    let showFlow = true;
+
+    // 初始化尺寸
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // 血液粒子类
+    class Particle {
+        constructor() {
+            this.reset();
+        }
+        reset() {
+            this.x = width / 2 + (Math.random() - 0.5) * 40;
+            this.y = height * 0.3; // 从心脏位置开始
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = Math.random() * 3 + 2;
+            this.life = Math.random() * 100;
+            this.alpha = 1;
+        }
+        update() {
+            this.y += this.vy;
+            this.x += Math.sin(this.y / 20) * 1.5; // 模拟血管弯曲
+            this.life -= 0.5;
+            if (this.life <= 0 || this.y > height * 0.8) this.reset();
+        }
+        draw() {
+            ctx.fillStyle = `rgba(255, 0, 50, ${this.life / 100})`;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // 创建血液循环粒子
+    for(let i=0; i<50; i++) particles.push(new Particle());
+
+    function drawHuman() {
+        ctx.clearRect(0, 0, width, height);
+
+        // 1. 绘制人体剪影 (写实渐变)
+        const grd = ctx.createLinearGradient(0, 0, 0, height);
+        grd.addColorStop(0, "#1a1a1a");
+        grd.addColorStop(0.5, "#2c3e50");
+        grd.addColorStop(1, "#1a1a1a");
+
+        ctx.strokeStyle = "#00d2ff";
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#00d2ff";
+
+        // 绘制一个简单的人体中轴
+        ctx.beginPath();
+        ctx.moveTo(width/2, height*0.1);
+        ctx.lineTo(width/2, height*0.9);
+        ctx.stroke();
+
+        // 2. 绘制会呼吸的“心脏”
+        const scale = 1 + Math.sin(Date.now() / 500) * 0.1;
+        ctx.fillStyle = "#ff0033";
+        ctx.shadowBlur = 20;
+        ctx.beginPath();
+        ctx.arc(width/2, height*0.3, 15 * scale, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3. 渲染血液流动动画
+        if (showFlow) {
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+        }
+
+        // 4. 绘制扫描线
+        const scanY = (Date.now() / 10) % height;
+        ctx.strokeStyle = "rgba(0, 210, 255, 0.2)";
+        ctx.beginPath();
+        ctx.moveTo(0, scanY);
+        ctx.lineTo(width, scanY);
+        ctx.stroke();
+
+        requestAnimationFrame(drawHuman);
+    }
+
+    function toggleFlow() { showFlow = !showFlow; }
+
+    // 交互检测
+    canvas.addEventListener('mousedown', (e) => {
+        const dist = Math.hypot(e.clientX - width/2, e.clientY - height*0.3);
+        if(dist < 30) {
+            document.getElementById('info').innerHTML = "<b>心脏系统:</b> 正在每分钟跳动 72 次。Canvas 实时纹理检测正常。";
+        }
+    });
+
+    drawHuman();
+</script>
+</body>
+</html>

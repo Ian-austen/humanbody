@@ -2,143 +2,109 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>高清人体结构科普 - Canvas 交互版</title>
+    <title>专业人体解剖科普站</title>
     <style>
-        body { margin: 0; background: #1a1a1a; color: #fff; font-family: system-ui; overflow: hidden; display: flex; }
-        #app { display: flex; width: 100vw; height: 100vh; }
+        :root { --accent: #3498db; --bg: #121212; }
+        body { margin: 0; background: var(--bg); color: white; font-family: -apple-system, sans-serif; display: flex; height: 100vh; }
         
-        /* 控制区 */
-        .panel { width: 320px; background: rgba(0,0,0,0.8); border-right: 1px solid #333; padding: 25px; z-index: 100; }
-        .info-box { background: #2c3e50; padding: 20px; border-radius: 12px; margin-top: 20px; border-left: 4px solid #3498db; }
+        /* 左侧控制栏 */
+        .sidebar { width: 350px; background: #1e1e1e; padding: 30px; border-right: 1px solid #333; overflow-y: auto; }
+        .nav-group { margin-bottom: 25px; }
+        h1 { font-size: 22px; color: var(--accent); margin-bottom: 30px; }
         
-        /* 画布区 */
-        .viewer { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; cursor: none; }
-        canvas { box-shadow: 0 0 50px rgba(0,0,0,0.5); border-radius: 8px; background: #fff; }
+        /* 身体展示区 */
+        .main-view { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #2c3e50 0%, #000 100%); }
+        svg { height: 90%; filter: drop-shadow(0 0 20px rgba(0,0,0,0.5)); }
         
-        /* 自定义放大镜指针 */
-        #lens {
-            position: absolute; width: 150px; height: 150px;
-            border: 3px solid #fff; border-radius: 50%;
-            pointer-events: none; visibility: hidden;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            overflow: hidden; z-index: 10;
-        }
+        /* 交互样式 */
+        .organ-part { cursor: pointer; transition: 0.3s; stroke: #fff; stroke-width: 0.5; }
+        .organ-part:hover { filter: brightness(1.3); stroke-width: 2px; }
+        
+        /* 介绍信息卡 */
+        .info-card { background: rgba(255,255,255,0.05); border: 1px solid #444; padding: 20px; border-radius: 12px; margin-top: 20px; line-height: 1.6; }
+        .info-card h3 { color: var(--accent); margin-top: 0; }
+        
+        /* 滑动条定制 */
+        input[type=range] { width: 100%; cursor: pointer; accent-color: var(--accent); }
+        .label-row { display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-<div id="app">
-    <div class="panel">
-        <h1>人体科普系统</h1>
-        <p>模式切换：</p>
-        <button onclick="currentMode='skin'" id="btn1">表层皮肤</button>
-        <button onclick="currentMode='organs'" id="btn2">内部解剖</button>
-        
-        <div class="info-box">
-            <h3 id="part-name">移动鼠标探索</h3>
-            <p id="part-desc">将圆圈对准人体部位，查看高清放大细节及功能介绍。</p>
+<div class="sidebar">
+    <h1>人体解剖系统</h1>
+    
+    <div class="nav-group">
+        <label>性别切换</label>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button onclick="changeGender('male')" style="flex:1; padding:8px;">男性</button>
+            <button onclick="changeGender('female')" style="flex:1; padding:8px;">女性</button>
         </div>
-        <p style="font-size: 12px; color: #666; margin-top: 50px;">* 基于 Canvas 像素采样技术渲染</p>
     </div>
 
-    <div class="viewer" id="v-box">
-        <canvas id="mainCanvas"></canvas>
-        <div id="lens"><canvas id="lensCanvas"></canvas></div>
+    <div class="nav-group">
+        <label>解剖层级 (透视)</label>
+        <input type="range" min="0" max="2" step="1" value="0" oninput="changeLayer(this.value)">
+        <div class="label-row">
+            <span>表层皮肤</span>
+            <span>内脏器官</span>
+            <span>骨骼系统</span>
+        </div>
+    </div>
+
+    <div class="info-card" id="info">
+        <h3 id="title">探索模式</h3>
+        <p id="desc">请拉动滑块切换解剖层级，并点击身体部位获取详细医学说明。</p>
     </div>
 </div>
 
+<div class="main-view">
+    <svg viewBox="0 0 200 550" id="human-svg">
+        <g id="layer-skin">
+            <path id="skin-path" d="M100,30 C120,30 140,50 140,90 C140,130 135,160 155,210 C175,260 165,490 145,520 L55,520 C35,490 25,260 45,210 C65,160 60,130 60,90 C60,50 80,30 100,30" fill="#e0ac69" />
+        </g>
+        
+        <g id="layer-organs" style="display:none">
+            <path class="organ-part" d="M75,120 Q60,120 60,170 Q80,190 95,175 L95,130 Z" fill="#ff7f7f" onclick="showData('lungs')"/>
+            <path class="organ-part" d="M125,120 Q140,120 140,170 Q120,190 105,175 L105,130 Z" fill="#ff7f7f" onclick="showData('lungs')"/>
+            <path class="organ-part" d="M95,145 Q100,130 115,145 Q125,165 100,185 Q75,165 85,145 Z" fill="#b33939" onclick="showData('heart')"/>
+            <path class="organ-part" d="M70,195 L115,190 L120,225 Q95,235 65,225 Z" fill="#706fd3" onclick="showData('liver')"/>
+            <path class="organ-part" d="M115,205 Q140,205 140,240 Q110,265 95,240 Z" fill="#ffb8b8" onclick="showData('stomach')"/>
+        </g>
+
+        <g id="layer-bones" style="display:none">
+            <circle cx="100" cy="70" r="25" fill="#f7f1e3" /> <rect x="95" y="100" width="10" height="150" fill="#f7f1e3" /> <path d="M60,120 Q100,110 140,120" stroke="#f7f1e3" fill="none" stroke-width="8"/> </div>
+    </svg>
+</div>
+
 <script>
-    const canvas = document.getElementById('mainCanvas');
-    const ctx = canvas.getContext('2d');
-    const lCanvas = document.getElementById('lensCanvas');
-    const lCtx = lCanvas.getContext('2d');
-    const lens = document.getElementById('lens');
-    const vBox = document.getElementById('v-box');
+    const infoData = {
+        heart: { t: "心脏 (Heart)", d: "位于胸腔中部偏左。主要由心肌构成，通过节律性收缩为血液循环提供动力，是生命的发动机。" },
+        lungs: { t: "肺部 (Lungs)", d: "呼吸系统的核心。左肺分为两叶，右肺分为三叶。负责空气交换，为血液提供氧气并排出二氧化碳。" },
+        liver: { t: "肝脏 (Liver)", d: "人体最大的实质性脏器，具有代谢、解毒、造血和免疫功能。它也是人体内唯一可以再生的内脏。" },
+        stomach: { t: "胃 (Stomach)", d: "消化管最膨大的部分。通过蠕动将食物磨碎，并分泌胃液初步消化蛋白质。" }
+    };
 
-    let currentMode = 'skin'; // skin or organs
-    const cW = 400, cH = 700;
-    canvas.width = cW; canvas.height = cH;
-    lCanvas.width = 150; lCanvas.height = 150;
-
-    // 模拟解剖数据
-    const anatomyData = [
-        { y: [50, 100], name: "头部", desc: "大脑是人体的指挥部，负责思考、记忆和控制全身运动。" },
-        { y: [120, 180], name: "胸腔 (肺/心)", desc: "包含心脏和肺部，负责呼吸循环和氧气运输。" },
-        { y: [200, 280], name: "腹部区域", desc: "集中了胃、肝、脾、肠等主要消化器官。" },
-        { y: [350, 600], name: "下肢", desc: "主要由股骨和强大的肌肉组成，支撑身体并提供动力。" }
-    ];
-
-    function drawHuman(tCtx, mode) {
-        tCtx.clearRect(0, 0, cW, cH);
-        
-        // 绘制写实轮廓渐变
-        const bodyGrd = tCtx.createLinearGradient(0, 0, cW, 0);
-        bodyGrd.addColorStop(0.3, mode === 'skin' ? '#ffdbac' : '#e74c3c');
-        bodyGrd.addColorStop(0.5, mode === 'skin' ? '#f1c27d' : '#c0392b');
-        bodyGrd.addColorStop(0.7, mode === 'skin' ? '#e8beac' : '#962d22');
-
-        tCtx.fillStyle = bodyGrd;
-        
-        // 绘制一个较为真实的人体外形路径
-        tCtx.beginPath();
-        tCtx.moveTo(200, 50); // 头顶
-        tCtx.bezierCurveTo(230, 50, 230, 100, 210, 110); // 脸部
-        tCtx.bezierCurveTo(260, 120, 280, 180, 270, 250); // 右臂
-        tCtx.lineTo(240, 250); // 右腋下
-        tCtx.bezierCurveTo(250, 350, 240, 650, 220, 680); // 右腿外侧
-        tCtx.lineTo(180, 680); // 右腿内侧
-        tCtx.lineTo(200, 400); // 裆部
-        tCtx.lineTo(220, 680); // 这里的逻辑简单示意
-        // (为了简洁，这里省略了左侧对称路径的细节，直接画一个闭合人形)
-        tCtx.lineTo(100, 680); 
-        tCtx.bezierCurveTo(150, 400, 150, 350, 130, 250);
-        tCtx.lineTo(100, 250);
-        tCtx.bezierCurveTo(120, 180, 140, 120, 190, 110);
-        tCtx.closePath();
-        tCtx.fill();
-
-        // 如果是器官模式，额外画一些内部结构
-        if(mode === 'organs') {
-            tCtx.fillStyle = "#fff";
-            tCtx.globalAlpha = 0.3;
-            tCtx.fillRect(185, 130, 30, 40); // 模拟心脏
-            tCtx.fillRect(160, 210, 80, 60); // 模拟肠胃
-            tCtx.globalAlpha = 1.0;
-        }
+    function changeLayer(val) {
+        const layers = ['layer-skin', 'layer-organs', 'layer-bones'];
+        layers.forEach((id, index) => {
+            document.getElementById(id).style.display = (index == val) ? 'block' : 'none';
+        });
     }
 
-    function update() {
-        drawHuman(ctx, currentMode);
-        requestAnimationFrame(update);
+    function showData(id) {
+        document.getElementById('title').innerText = infoData[id].t;
+        document.getElementById('desc').innerText = infoData[id].d;
     }
 
-    // 交互逻辑
-    vBox.addEventListener('mousemove', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        if (x > 0 && x < cW && y > 0 && y < cH) {
-            lens.style.visibility = 'visible';
-            lens.style.left = (e.clientX - 75) + 'px';
-            lens.style.top = (e.clientY - 75) + 'px';
-
-            // 放大镜渲染：将主画布的内容放大 2 倍画到透镜里
-            lCtx.clearRect(0, 0, 150, 150);
-            lCtx.drawImage(canvas, x - 37.5, y - 37.5, 75, 75, 0, 0, 150, 150);
-
-            // 更新介绍
-            const found = anatomyData.find(d => y >= d.y[0] && y <= d.y[1]);
-            if(found) {
-                document.getElementById('part-name').innerText = found.name;
-                document.getElementById('part-desc').innerText = found.desc;
-            }
+    function changeGender(gender) {
+        const skin = document.getElementById('skin-path');
+        if(gender === 'female') {
+            skin.setAttribute('d', "M100,30 C120,30 135,50 135,90 C135,130 145,170 160,210 C180,260 155,490 135,520 L65,520 C45,490 20,260 40,210 C55,170 65,130 65,90 C65,50 80,30 100,30");
         } else {
-            lens.style.visibility = 'hidden';
+            skin.setAttribute('d', "M100,30 C120,30 140,50 140,90 C140,130 135,160 155,210 C175,260 165,490 145,520 L55,520 C35,490 25,260 45,210 C65,160 60,130 60,90 C60,50 80,30 100,30");
         }
-    });
-
-    update();
+    }
 </script>
 </body>
 </html>

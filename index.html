@@ -2,111 +2,110 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>高清写实人体解剖科普站</title>
+    <title>3D质感人体科普站</title>
     <style>
-        :root { --accent: #e74c3c; --panel: #1a1a1a; }
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        :root { --accent: #e74c3c; --skin: #f3c9a2; --organ: #c0392b; }
+        body { margin: 0; background: #0a0a0a; color: #eee; font-family: system-ui; display: flex; height: 100vh; overflow: hidden; }
         
-        /* 侧边栏 */
-        .sidebar { width: 380px; background: var(--panel); padding: 30px; border-right: 1px solid #333; display: flex; flex-direction: column; gap: 20px; z-index: 10; }
-        h1 { font-size: 24px; margin: 0; background: linear-gradient(45deg, #fff, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        /* 布局 */
+        .sidebar { width: 320px; background: #151515; padding: 25px; border-right: 1px solid #333; display: flex; flex-direction: column; gap: 15px; }
+        .stage { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #222, #000); }
         
-        /* 展示区 */
-        .viewer { flex: 1; position: relative; background: radial-gradient(circle, #222 0%, #000 100%); display: flex; justify-content: center; align-items: center; }
-        .body-container { position: relative; height: 90vh; width: 400px; }
-        
-        /* 图片层叠逻辑 */
-        .layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: contain; transition: opacity 0.4s ease;
-        }
+        /* 人体容器 */
+        .human-container { width: 450px; height: 850px; position: relative; }
+        svg { width: 100%; height: 100%; filter: drop-shadow(0 0 15px rgba(0,0,0,0.5)); }
 
-        /* 交互面板 */
-        .control-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; }
-        input[type=range] { width: 100%; cursor: pointer; accent-color: var(--accent); }
-        .info-card { background: #222; border-left: 4px solid var(--accent); padding: 20px; border-radius: 8px; min-height: 180px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        /* 交互效果 */
+        .organ { cursor: pointer; transition: 0.3s; stroke: rgba(255,255,255,0); stroke-width: 2; }
+        .organ:hover { stroke: rgba(255,255,255,0.8); filter: brightness(1.2); }
         
-        button { background: #333; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; transition: 0.3s; }
-        button.active { background: var(--accent); }
-        .hotspot { position: absolute; cursor: pointer; border: 1px solid transparent; }
-        .hotspot:hover { border: 1px dashed rgba(255,255,255,0.5); background: rgba(255,255,255,0.1); }
+        /* UI组件 */
+        .card { background: #222; padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent); }
+        input[type=range] { width: 100%; cursor: pointer; accent-color: var(--accent); margin: 15px 0; }
+        .btn-toggle { background: #333; color: #fff; border: 1px solid #444; padding: 8px 15px; border-radius: 6px; cursor: pointer; flex: 1; }
+        .btn-toggle.active { background: var(--accent); border-color: var(--accent); }
     </style>
 </head>
 <body>
 
 <div class="sidebar">
-    <h1>人体结构与功能科普</h1>
+    <h2 style="margin:0; color:var(--accent);">人体科普系统</h2>
+    <p style="font-size: 13px; color: #888;">实时渲染引擎 (WebGL/SVG)</p>
     
-    <div class="control-box">
-        <label>性别/视角切换</label>
-        <div style="display:flex; gap:10px; margin-top:10px;">
-            <button id="btn-m" class="active" onclick="setView('male')">男性正面</button>
-            <button id="btn-f" onclick="setView('female')">女性正面</button>
-        </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn-toggle active" id="m-btn" onclick="setGender('male')">男/正面</button>
+        <button class="btn-toggle" id="f-btn" onclick="setGender('female')">女/正面</button>
     </div>
 
-    <div class="control-box">
-        <label>解剖深度 (Slide to Dissect)</label>
-        <input type="range" id="depth" min="0" max="100" value="100" oninput="updateDepth(this.value)">
-        <div style="display:flex; justify-content:space-between; font-size:12px; color:#888; margin-top:5px;">
-            <span>内部器官</span><span>肌肉/皮肤</span>
-        </div>
+    <div>
+        <label style="font-size: 14px;">解剖透明度 (Dissection)</label>
+        <input type="range" min="0" max="100" value="100" oninput="dissect(this.value)">
     </div>
 
-    <div class="info-card" id="info-panel">
-        <h3 id="info-title">点击身体部位探索</h3>
-        <p id="info-text">拖动上方滑块可观察皮肤下的肌肉与内脏分布。点击对应区域查看医学解析。</p>
+    <div class="card">
+        <h3 id="info-t" style="margin-top:0; color:var(--accent);">移动鼠标点击</h3>
+        <p id="info-d" style="font-size: 14px; line-height: 1.6;">拖动滑块可以“看穿”皮肤。点击具体的红色器官区域获取解剖学功能介绍。</p>
     </div>
 </div>
 
-<div class="viewer">
-    <div class="body-container" id="body-box">
-        <img id="img-internal" class="layer" src="http://googleusercontent.com/image_collection/image_retrieval/17199362456836802893_0" style="opacity:0">
-        <img id="img-skin" class="layer" src="http://googleusercontent.com/image_collection/image_retrieval/341940029880142907_1">
-        
-        <div class="hotspot" style="top:5%; left:35%; width:30%; height:12%;" onclick="showInfo('brain')"></div>
-        <div class="hotspot" style="top:22%; left:30%; width:40%; height:15%;" onclick="showInfo('lungs')"></div>
-        <div class="hotspot" style="top:28%; left:42%; width:16%; height:10%;" onclick="showInfo('heart')"></div>
-        <div class="hotspot" style="top:40%; left:30%; width:40%; height:15%;" onclick="showInfo('digestive')"></div>
+<div class="stage">
+    <div class="human-container">
+        <svg viewBox="0 0 200 500">
+            <defs>
+                <radialGradient id="skinG">
+                    <stop offset="0%" stop-color="#ffe4c4" />
+                    <stop offset="100%" stop-color="#d2b48c" />
+                </radialGradient>
+                <linearGradient id="organG" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#ff5f6d" />
+                    <stop offset="100%" stop-color="#ffc371" />
+                </linearGradient>
+            </defs>
+
+            <path id="skin" d="M100,20 C115,20 130,35 130,70 C130,110 120,135 145,180 C170,230 155,480 135,480 L65,480 C45,480 30,230 55,180 C80,135 70,110 70,70 C70,35 85,20 100,20" fill="url(#skinG)" />
+
+            <g id="internal" style="opacity: 0;">
+                <path class="organ" d="M75,110 Q60,110 60,160 Q80,180 95,165 Z" fill="#ff7f7f" onclick="show('lungs')"/>
+                <path class="organ" d="M125,110 Q140,110 140,160 Q120,180 105,165 Z" fill="#ff7f7f" onclick="show('lungs')"/>
+                <circle class="organ" cx="102" cy="140" r="12" fill="#b33939" onclick="show('heart')"/>
+                <path class="organ" d="M75,185 L115,180 L120,210 Q95,220 70,210 Z" fill="#8e44ad" onclick="show('liver')"/>
+                <path class="organ" d="M115,200 Q140,200 135,240 Q110,260 90,240 Z" fill="#eb9d8d" onclick="show('stomach')"/>
+                <rect class="organ" x="80" y="250" width="45" height="40" rx="5" fill="#d35400" onclick="show('intestine')"/>
+            </g>
+        </svg>
     </div>
 </div>
 
 <script>
-    const data = {
-        brain: { t: "大脑 (Brain)", d: "中枢神经系统的最高级部分。负责处理感官信息、发起运动、产生语言以及进行思考和记忆。它消耗了人体约20%的氧气和能量。" },
-        lungs: { t: "肺 (Lungs)", d: "呼吸系统的核心器官。写实图中展示了左右肺叶，它们负责将氧气吸入血液并排出二氧化碳。成年人每天呼吸约2万次。" },
-        heart: { t: "心脏 (Heart)", d: "强有力的肌肉泵，位于胸腔中部偏左。它通过收缩将血液泵向全身。这张图中你可以看到它与大血管的连接点。" },
-        digestive: { t: "消化系统 (Digestive)", d: "包括胃、肝脏、小肠和大肠。负责分解食物并吸收维持生命所需的营养物质。肝脏也是人体最大的解剖腺体。" }
+    const db = {
+        heart: { t: "心脏 (The Heart)", d: "人体内循环系统的核心泵，位于胸腔中部，由强健的心肌构成。它负责将氧气丰富的血液输送到全身各处。" },
+        lungs: { t: "肺部 (The Lungs)", d: "呼吸系统的主要器官。通过数亿个肺泡进行气体交换，吸入氧气并排出二氧化碳。" },
+        liver: { t: "肝脏 (The Liver)", d: "人体内最大的内脏器官。具有代谢、解毒、制造胆汁等500多种功能，是人体最重要的“化学加工厂”。" },
+        stomach: { t: "胃部 (The Stomach)", d: "消化系统的囊状器官，通过分泌强酸和酶来初步分解食物。它的内壁每隔几天就会自我更新。" },
+        intestine: { t: "肠道 (Intestines)", d: "包括小肠和大肠。小肠主要负责吸收营养，而大肠负责吸收水分。它们的总长度超过6米。" }
     };
 
-    function updateDepth(val) {
-        // 实现丝滑的透明度切换
-        document.getElementById('img-skin').style.opacity = val / 100;
-        document.getElementById('img-internal').style.opacity = 1 - (val / 100);
+    function dissect(val) {
+        document.getElementById('skin').style.opacity = val / 100;
+        document.getElementById('internal').style.opacity = 1 - (val / 100);
     }
 
-    function showInfo(key) {
-        document.getElementById('info-title').innerText = data[key].t;
-        document.getElementById('info-text').innerText = data[key].d;
+    function show(key) {
+        document.getElementById('info-t').innerText = db[key].t;
+        document.getElementById('info-d').innerText = db[key].d;
     }
 
-    function setView(gender) {
-        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-        const skinImg = document.getElementById('img-skin');
-        const internalImg = document.getElementById('img-internal');
-        
-        if(gender === 'male') {
-            skinImg.src = "http://googleusercontent.com/image_collection/image_retrieval/341940029880142907_1";
-            internalImg.src = "http://googleusercontent.com/image_collection/image_retrieval/17199362456836802893_0";
-            document.getElementById('btn-m').classList.add('active');
+    function setGender(g) {
+        document.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+        const skin = document.getElementById('skin');
+        if(g === 'male') {
+            document.getElementById('m-btn').classList.add('active');
+            skin.setAttribute('d', "M100,20 C115,20 130,35 130,70 C130,110 120,135 145,180 C170,230 155,480 135,480 L65,480 C45,480 30,230 55,180 C80,135 70,110 70,70 C70,35 85,20 100,20");
         } else {
-            // 引用另一组女性写实素材
-            skinImg.src = "http://googleusercontent.com/image_collection/image_retrieval/341940029880142907_0";
-            internalImg.src = "http://googleusercontent.com/image_collection/image_retrieval/17199362456836802893_1";
-            document.getElementById('btn-f').classList.add('active');
+            document.getElementById('f-btn').classList.add('active');
+            skin.setAttribute('d', "M100,20 C115,20 130,40 130,75 C130,115 145,150 155,200 C175,260 155,480 130,480 L70,480 C45,480 25,260 45,200 C55,150 70,115 70,75 C70,40 85,20 100,20");
         }
     }
 </script>
-
 </body>
 </html>
